@@ -54,19 +54,19 @@ jobs:
           set -o pipefail
           pnpm test 2>&1 | tee "$RUNNER_TEMP/svelte-validation-logs/test.log"
 
-      - name: Lint the project
-        if: always() && steps.install.outcome == 'success'
-        shell: bash
-        run: |
-          set -o pipefail
-          pnpm lint 2>&1 | tee "$RUNNER_TEMP/svelte-validation-logs/lint.log"
-
       - name: Build and typecheck the project
         if: always() && steps.install.outcome == 'success'
         shell: bash
         run: |
           set -o pipefail
           pnpm check 2>&1 | tee "$RUNNER_TEMP/svelte-validation-logs/check.log"
+
+      - name: Lint the project
+        if: always() && steps.install.outcome == 'success'
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm lint 2>&1 | tee "$RUNNER_TEMP/svelte-validation-logs/lint.log"
 
       - name: Upload validation logs
         if: always()
