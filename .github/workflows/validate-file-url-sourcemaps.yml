@@ -1,0 +1,78 @@
+name: Validate file URL sourcemaps (fork only)
+
+on:
+  push:
+    branches: [codex/validate-svelte-file-urls]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CI: 'true'
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+
+jobs:
+  validate:
+    if: github.repository_owner == 'pentaoa' && github.ref == 'refs/heads/codex/validate-svelte-file-urls'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093 # v6.0.8
+        with:
+          version: 10.33.4
+          run_install: false
+
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+
+      - name: Install locked dependencies
+        id: install
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/svelte-validation-logs"
+          pnpm install --frozen-lockfile 2>&1 | tee "$RUNNER_TEMP/svelte-validation-logs/install.log"
+
+      - name: Install Chromium headless shell and system dependencies
+        id: browser
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm exec playwright install --with-deps --only-shell chromium 2>&1 | tee "$RUNNER_TEMP/svelte-validation-logs/browser-install.log"
+
+      - name: Run the full test suite
+        if: always() && steps.install.outcome == 'success' && steps.browser.outcome == 'success'
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm test 2>&1 | tee "$RUNNER_TEMP/svelte-validation-logs/test.log"
+
+      - name: Lint the project
+        if: always() && steps.install.outcome == 'success'
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm lint 2>&1 | tee "$RUNNER_TEMP/svelte-validation-logs/lint.log"
+
+      - name: Build and typecheck the project
+        if: always() && steps.install.outcome == 'success'
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm check 2>&1 | tee "$RUNNER_TEMP/svelte-validation-logs/check.log"
+
+      - name: Upload validation logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: file-url-sourcemap-validation-logs
+          path: ${{ runner.temp }}/svelte-validation-logs/
+          if-no-files-found: warn
+          retention-days: 7
